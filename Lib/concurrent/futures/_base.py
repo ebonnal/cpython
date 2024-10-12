@@ -4,10 +4,14 @@
 __author__ = 'Brian Quinlan (brian@sweetapp.com)'
 
 import collections
+import itertools
 import logging
+from multiprocessing import Queue
 import threading
 import time
 import types
+
+from contextlib import suppress
 
 FIRST_COMPLETED = 'FIRST_COMPLETED'
 FIRST_EXCEPTION = 'FIRST_EXCEPTION'
@@ -572,7 +576,35 @@ class Executor(object):
         """
         raise NotImplementedError()
 
-    def map(self, fn, *iterables, timeout=None, chunksize=1):
+    def _buffered_map(self, fn, timeout, buffersize, *iterables):
+        if timeout is not None:
+            end_time = timeout + time.monotonic()
+
+        zip_iterator = iter(zip(*iterables))
+        fs = collections.deque(
+            (self.submit(fn, *args) for args in itertools.islice(zip_iterator, buffersize)),
+            maxlen=buffersize,
+        )
+
+        # Yield must be hidden in closure so that the futures are submitted
+        # before the first iterator value is required.
+        def result_iterator():
+            try:
+                while fs:
+                    # Careful not to keep a reference to the popped future
+                    if timeout is None:
+                        result = _result_or_cancel(fs.popleft())
+                    else:
+                        result = _result_or_cancel(fs.popleft(), end_time - time.monotonic())
+                    with suppress(StopIteration):
+                        fs.append(self.submit(fn, *next(zip_iterator)))
+                    yield result
+            finally:
+                for future in fs:
+                    future.cancel()
+        return result_iterator()
+
+    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=None):
         """Returns an iterator equivalent to map(fn, iter).
 
         Args:
@@ -584,6 +616,9 @@ class Executor(object):
                 before being passed to a child process. This argument is only
                 used by ProcessPoolExecutor; it is ignored by
                 ThreadPoolExecutor.
+            buffersize: The number of not-yet-yielded results buffered.
+                If the buffer is full, then iteration over `iterables` is paused 
+                until an element is yielded out of the buffer.
 
         Returns:
             An iterator equivalent to: map(func, *iterables) but the calls may
@@ -594,6 +629,10 @@ class Executor(object):
                 before the given timeout.
             Exception: If fn(*args) raises for any values.
         """
+        if buffersize is not None:
+            if buffersize < 1:
+                raise ValueError("buffersize must be None or >= 1.")
+            return self._buffered_map(fn, timeout, buffersize, *iterables)
         if timeout is not None:
             end_time = timeout + time.monotonic()
 

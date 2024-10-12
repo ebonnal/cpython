@@ -4,6 +4,7 @@ import multiprocessing.process
 import multiprocessing.util
 import os
 import threading
+import time
 import unittest
 from concurrent import futures
 from test import support
