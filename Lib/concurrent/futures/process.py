@@ -51,7 +51,6 @@ import queue
 import multiprocessing as mp
 # This import is required to load the multiprocessing.connection submodule
 # so that it can be accessed later as `mp.connection`
-import multiprocessing.connection
 from multiprocessing.queues import Queue
 import threading
 import weakref
@@ -824,6 +823,9 @@ class ProcessPoolExecutor(_base.Executor):
             chunksize: If greater than one, the iterables will be chopped into
                 chunks of size chunksize and submitted to the process pool.
                 If set to one, the items in the list will be sent one at a time.
+            buffersize: The maximum number of not-yet-yielded results buffered.
+                If the buffer is full, then iteration over `iterables` is paused
+                until an element is yielded out of the buffer.
 
         Returns:
             An iterator equivalent to: map(func, *iterables) but the calls may

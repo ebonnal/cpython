@@ -6,13 +6,10 @@ __author__ = 'Brian Quinlan (brian@sweetapp.com)'
 import collections
 import itertools
 import logging
-from multiprocessing import Queue
-import sys
 import threading
 import time
 import types
 
-from contextlib import suppress
 
 FIRST_COMPLETED = 'FIRST_COMPLETED'
 FIRST_EXCEPTION = 'FIRST_EXCEPTION'
@@ -589,8 +586,8 @@ class Executor(object):
                 before being passed to a child process. This argument is only
                 used by ProcessPoolExecutor; it is ignored by
                 ThreadPoolExecutor.
-            buffersize: The number of not-yet-yielded results buffered.
-                If the buffer is full, then iteration over `iterables` is paused 
+            buffersize: The maximum number of not-yet-yielded results buffered.
+                If the buffer is full, then iteration over `iterables` is paused
                 until an element is yielded out of the buffer.
 
         Returns:
@@ -613,6 +610,7 @@ class Executor(object):
         fs = collections.deque(
             (self.submit(fn, *args) for args in itertools.islice(zip_iterator, buffersize)),
         )
+
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
         def result_iterator():
