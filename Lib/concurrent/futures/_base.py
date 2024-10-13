@@ -4,7 +4,7 @@
 __author__ = 'Brian Quinlan (brian@sweetapp.com)'
 
 import collections
-import itertools
+from itertools import islice
 import logging
 import threading
 import time
@@ -607,7 +607,7 @@ class Executor(object):
         args_iter = iter(zip(*iterables))
         if buffersize:
             fs = collections.deque(
-                self.submit(fn, *args) for args in itertools.islice(args_iter, buffersize)
+                self.submit(fn, *args) for args in islice(args_iter, buffersize)
             )
         else:
             fs = [self.submit(fn, *args) for args in args_iter]
@@ -616,9 +616,9 @@ class Executor(object):
         # before the first iterator value is required.
         def result_iterator():
             try:
-                # reverse to have the first future on the right
+                # reverse so that pop is FIFO
                 fs.reverse()
-                # args may be remaining if futures buffer is full
+                # args may be remaining if buffersize has been reached
                 args_iter_has_next = len(fs) == buffersize
 
                 while fs:
