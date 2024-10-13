@@ -613,11 +613,10 @@ class Executor(object):
         fs = collections.deque(
             (self.submit(fn, *args) for args in itertools.islice(zip_iterator, buffersize)),
         )
-
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
         def result_iterator():
-            has_next = True
+            has_next = len(fs) == buffersize
             try:
                 while fs:
                     if has_next:
