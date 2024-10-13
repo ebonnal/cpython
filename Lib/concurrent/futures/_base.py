@@ -604,27 +604,30 @@ class Executor(object):
         if timeout is not None:
             end_time = timeout + time.monotonic()
 
-        zip_iterator = iter(zip(*iterables))
-
+        args_iter = iter(zip(*iterables))
         if buffersize:
             fs = collections.deque(
-                self.submit(fn, *args) for args in itertools.islice(zip_iterator, buffersize)
+                self.submit(fn, *args) for args in itertools.islice(args_iter, buffersize)
             )
         else:
-            fs = [self.submit(fn, *args) for args in zip_iterator]
-        fs.reverse()
+            fs = [self.submit(fn, *args) for args in args_iter]
 
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
         def result_iterator():
-            has_next = len(fs) == buffersize
             try:
+                # reverse to have the first future on the right
+                fs.reverse()
+                # args may be remaining if futures buffer is full
+                args_iter_has_next = len(fs) == buffersize
+
                 while fs:
-                    if has_next:
+                    if args_iter_has_next:
                         try:
-                            fs.appendleft(self.submit(fn, *next(zip_iterator)))
+                            fs.appendleft(self.submit(fn, *next(args_iter)))
                         except StopIteration:
-                            has_next = False
+                            args_iter_has_next = False
+
                     # Careful not to keep a reference to the popped future
                     if timeout is None:
                         yield _result_or_cancel(fs.pop())

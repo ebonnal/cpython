@@ -15,19 +15,23 @@ class PoolExecutorTest(BaseTestCase):
                     ValueError, "buffersize must be None or >= 1."
                 ):
                     pool.map(bool, [], buffersize=0)
-            for buffersize in [1, 5]:
-                iterable = range(10)
+            for buffersize, iterable_size in [
+                    (1, 5),
+                    (5, 5),
+                    (10, 5),
+            ]:
+                iterable = range(iterable_size)
                 processed_elements = manager.list()
                 with ExecutorType(max_workers=1) as pool:
                     iterator = pool.map(
                         processed_elements.append, iterable, buffersize=buffersize
                     )
                     time.sleep(0.2)  # wait for buffered futures to finish
-                    self.assertSetEqual(set(processed_elements), set(range(buffersize)))
+                    self.assertSetEqual(set(processed_elements), set(range(min(buffersize, iterable_size))))
                     next(iterator)
                     time.sleep(0.1)  # wait for the created future to finish
                     self.assertSetEqual(
-                        set(processed_elements), set(range(buffersize + 1))
+                        set(processed_elements), set(range(min(buffersize + 1, iterable_size)))
                     )
 
 
