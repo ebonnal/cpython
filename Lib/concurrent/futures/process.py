@@ -51,6 +51,7 @@ import queue
 import multiprocessing as mp
 # This import is required to load the multiprocessing.connection submodule
 # so that it can be accessed later as `mp.connection`
+import multiprocessing.connection
 from multiprocessing.queues import Queue
 import threading
 import weakref
@@ -866,4 +867,3 @@ class ProcessPoolExecutor(_base.Executor):
         self._executor_manager_thread_wakeup = None
 
     shutdown.__doc__ = _base.Executor.shutdown.__doc__
- # type: ignore

@@ -1,5 +1,7 @@
 import contextlib
 import multiprocessing as mp
+import multiprocessing.process
+import multiprocessing.util
 import os
 import threading
 import unittest
