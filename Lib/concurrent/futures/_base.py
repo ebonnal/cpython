@@ -604,13 +604,13 @@ class Executor(object):
         if timeout is not None:
             end_time = timeout + time.monotonic()
 
-        args_iter = iter(zip(*iterables))
         if buffersize:
+            args_iter = iter(zip(*iterables))
             fs = collections.deque(
                 self.submit(fn, *args) for args in islice(args_iter, buffersize)
             )
         else:
-            fs = [self.submit(fn, *args) for args in args_iter]
+            fs = [self.submit(fn, *args) for args in zip(*iterables)]
 
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
