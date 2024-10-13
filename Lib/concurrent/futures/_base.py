@@ -577,7 +577,7 @@ class Executor(object):
         """
         raise NotImplementedError()
 
-    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=sys.maxsize):
+    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=None):
         """Returns an iterator equivalent to map(fn, iter).
 
         Args:
@@ -602,7 +602,7 @@ class Executor(object):
                 before the given timeout.
             Exception: If fn(*args) raises for any values.
         """
-        if buffersize < 1:
+        if buffersize is not None and buffersize < 1:
             raise ValueError("buffersize must be None or >= 1.")
 
         if timeout is not None:
@@ -612,7 +612,6 @@ class Executor(object):
 
         fs = collections.deque(
             (self.submit(fn, *args) for args in itertools.islice(zip_iterator, buffersize)),
-            maxlen=buffersize,
         )
 
         # Yield must be hidden in closure so that the futures are submitted

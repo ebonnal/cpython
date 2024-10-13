@@ -3,11 +3,10 @@ from multiprocessing import Manager
 import time
 import unittest
 
-from .executor import ExecutorTest
 from .util import BaseTestCase, setup_module
 
 
-class PoolExecutorTest(ExecutorTest, BaseTestCase):
+class PoolExecutorTest(BaseTestCase):
     def test_map_buffersize(self):
         manager = Manager()
         for ExecutorType in (ThreadPoolExecutor, ProcessPoolExecutor):
