@@ -15,11 +15,9 @@ class PoolExecutorTest(BaseTestCase):
                     ValueError, "buffersize must be None or >= 1."
                 ):
                     pool.map(bool, [], buffersize=0)
-
             for buffersize in [1, 5]:
                 iterable = range(10)
                 processed_elements = manager.list()
-
                 with ExecutorType(max_workers=1) as pool:
                     iterator = pool.map(
                         processed_elements.append, iterable, buffersize=buffersize

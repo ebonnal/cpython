@@ -606,9 +606,13 @@ class Executor(object):
 
         zip_iterator = iter(zip(*iterables))
 
-        fs = collections.deque(
-            (self.submit(fn, *args) for args in itertools.islice(zip_iterator, buffersize)),
-        )
+        if buffersize:
+            fs = collections.deque(
+                self.submit(fn, *args) for args in itertools.islice(zip_iterator, buffersize)
+            )
+        else:
+            fs = [self.submit(fn, *args) for args in zip_iterator]
+        fs.reverse()
 
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
@@ -618,14 +622,14 @@ class Executor(object):
                 while fs:
                     if has_next:
                         try:
-                            fs.append(self.submit(fn, *next(zip_iterator)))
+                            fs.appendleft(self.submit(fn, *next(zip_iterator)))
                         except StopIteration:
                             has_next = False
                     # Careful not to keep a reference to the popped future
                     if timeout is None:
-                        yield _result_or_cancel(fs.popleft())
+                        yield _result_or_cancel(fs.pop())
                     else:
-                        yield _result_or_cancel(fs.popleft(), end_time - time.monotonic())
+                        yield _result_or_cancel(fs.pop(), end_time - time.monotonic())
             finally:
                 for future in fs:
                     future.cancel()
