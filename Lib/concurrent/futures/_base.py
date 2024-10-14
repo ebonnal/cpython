@@ -623,8 +623,8 @@ class Executor(object):
                 # reverse to keep finishing order
                 fs.reverse()
                 while fs:
-                    launch_next()
                     # Careful not to keep a reference to the popped future
+                    launch_next()
                     if timeout is None:
                         yield _result_or_cancel(fs.pop())
                     else:
