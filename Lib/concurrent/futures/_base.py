@@ -9,6 +9,7 @@ import logging
 import threading
 import time
 import types
+import weakref
 
 FIRST_COMPLETED = 'FIRST_COMPLETED'
 FIRST_EXCEPTION = 'FIRST_EXCEPTION'
@@ -604,17 +605,14 @@ class Executor(object):
         if timeout is not None:
             end_time = timeout + time.monotonic()
 
+        executor = weakref.ref(self)
+        args_iter = iter(zip(*iterables))
         if buffersize:
-            args_iter = iter(zip(*iterables))
             fs = collections.deque(
                 self.submit(fn, *args) for args in islice(args_iter, buffersize)
             )
-            def launch_next():
-                if (args := next(args_iter, None)) is not None:
-                    fs.appendleft(self.submit(fn, *args))
         else:
-            fs = [self.submit(fn, *args) for args in zip(*iterables)]
-            launch_next = lambda: None
+            fs = [self.submit(fn, *args) for args in args_iter]
 
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
@@ -624,7 +622,8 @@ class Executor(object):
                 fs.reverse()
                 while fs:
                     # Careful not to keep a reference to the popped future
-                    launch_next()
+                    if executor() and (args := next(args_iter, None)) is not None:
+                        fs.appendleft(executor().submit(fn, *args))
                     if timeout is None:
                         yield _result_or_cancel(fs.pop())
                     else:
