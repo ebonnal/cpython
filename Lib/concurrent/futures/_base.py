@@ -609,8 +609,12 @@ class Executor(object):
             fs = collections.deque(
                 self.submit(fn, *args) for args in islice(args_iter, buffersize)
             )
+            def launch_next():
+                if (args := next(args_iter, None)) is not None:
+                    fs.appendleft(self.submit(fn, *args))
         else:
             fs = [self.submit(fn, *args) for args in zip(*iterables)]
+            launch_next = lambda: None
 
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
@@ -618,16 +622,9 @@ class Executor(object):
             try:
                 # reverse so that pop is FIFO
                 fs.reverse()
-                # args may be remaining if buffersize has been reached
-                args_iter_has_next = len(fs) == buffersize
 
                 while fs:
-                    if args_iter_has_next:
-                        try:
-                            fs.appendleft(self.submit(fn, *next(args_iter)))
-                        except StopIteration:
-                            args_iter_has_next = False
-
+                    launch_next()
                     # Careful not to keep a reference to the popped future
                     if timeout is None:
                         yield _result_or_cancel(fs.pop())
