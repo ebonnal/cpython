@@ -620,9 +620,8 @@ class Executor(object):
         # before the first iterator value is required.
         def result_iterator():
             try:
-                # reverse so that pop is FIFO
+                # reverse to keep finishing order
                 fs.reverse()
-
                 while fs:
                     launch_next()
                     # Careful not to keep a reference to the popped future
