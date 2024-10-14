@@ -605,7 +605,6 @@ class Executor(object):
         if timeout is not None:
             end_time = timeout + time.monotonic()
 
-        executor = weakref.ref(self)
         args_iter = iter(zip(*iterables))
         if buffersize:
             fs = collections.deque(
@@ -613,6 +612,8 @@ class Executor(object):
             )
         else:
             fs = [self.submit(fn, *args) for args in args_iter]
+
+        executor_weakref = weakref.ref(self)
 
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
@@ -622,8 +623,8 @@ class Executor(object):
                 fs.reverse()
                 while fs:
                     # Careful not to keep a reference to the popped future
-                    if executor() and (args := next(args_iter, None)) is not None:
-                        fs.appendleft(executor().submit(fn, *args))
+                    if (args := next(args_iter, None)) and (executor := executor_weakref()):
+                        fs.appendleft(executor.submit(fn, *args))
                     if timeout is None:
                         yield _result_or_cancel(fs.pop())
                     else:
