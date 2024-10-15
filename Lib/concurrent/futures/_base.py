@@ -623,7 +623,7 @@ class Executor(object):
                 fs.reverse()
                 while fs:
                     # Careful not to keep a reference to the popped future
-                    if buffersize and (args := next(args_iter, None)) and (executor := executor_weakref()):
+                    if buffersize and (executor := executor_weakref()) and (args := next(args_iter, None)):
                         fs.appendleft(executor.submit(fn, *args))
                     if timeout is None:
                         yield _result_or_cancel(fs.pop())
