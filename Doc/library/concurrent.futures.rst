@@ -43,9 +43,9 @@ Executor Objects
 
       Similar to :func:`map(fn, *iterables) <map>` except:
 
-      * the *iterables* are collected immediately rather than lazily, except if
-        a *buffersize* is specified: If the buffer is full, then the iteration
-        over *iterables* is paused until a result is yielded out of the buffer.
+      * the *iterables* are collected immediately rather than lazily, unless a
+        *buffersize* is specified: If the buffer is full, then the iteration
+        over *iterables* is paused until a result is yielded from the buffer.
 
       * *fn* is executed asynchronously and several calls to
         *fn* may be made concurrently.
