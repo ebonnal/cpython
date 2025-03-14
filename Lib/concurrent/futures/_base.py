@@ -5,6 +5,7 @@ __author__ = 'Brian Quinlan (brian@sweetapp.com)'
 
 import collections
 import logging
+from multiprocessing import Queue
 import threading
 import time
 import types
@@ -574,7 +575,7 @@ class Executor(object):
         """
         raise NotImplementedError()
 
-    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=None):
+    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=None, ordered=True):
         """Returns an iterator equivalent to map(fn, iter).
 
         Args:
@@ -591,6 +592,10 @@ class Executor(object):
                 iterables pauses until a result is yielded from the buffer.
                 If None, all input elements are eagerly collected, and a task is
                 submitted for each.
+            ordered: Whether to yield the results in the order of input
+                iterables (default) or to yield them in the order they become
+                available.
+            
 
         Returns:
             An iterator equivalent to: map(func, *iterables) but the calls may
@@ -616,6 +621,13 @@ class Executor(object):
             )
         else:
             fs = [self.submit(fn, *args) for args in zipped_iterables]
+        
+        if not ordered:
+            results = Queue()
+            for future in fs:
+                future: Future
+                future.add_done_callback(lambda f: results.put(f.result()))
+
 
         # Use a weak reference to ensure that the executor can be garbage
         # collected independently of the result_iterator closure.
