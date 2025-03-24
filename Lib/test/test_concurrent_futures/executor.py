@@ -1,3 +1,4 @@
+import gc
 import itertools
 import threading
 import time
@@ -52,11 +53,33 @@ class ExecutorTest:
                 list(map(pow, range(10), range(10))))
 
     def test_map_exception(self):
-        i = self.executor.map(divmod, [1, 1, 1, 1], [2, 3, 0, 5])
-        self.assertEqual(i.__next__(), (0, 1))
-        self.assertEqual(i.__next__(), (0, 1))
-        with self.assertRaises(ZeroDivisionError):
-            i.__next__()
+        results = self.executor.map(divmod, [3, 2, 1, 1], [2, 2, 0, 0])
+
+        # wait for all futures to complete
+        self.executor.shutdown(wait=True)
+
+        # the first two futures should have completed successfully
+        self.assertEqual(next(results), (1, 1))
+        self.assertEqual(next(results), (1, 0))
+
+        # the next one should raise a ZeroDivisionError
+        error = None
+        try:
+            next(results)
+        except ZeroDivisionError as e:
+            error = e
+        self.assertTrue(error)
+
+        # a failed future must not be captured in its
+        # future._exception.__traceback__ to avoid a reference cycle
+        self.assertFalse(gc.get_referrers(error))
+
+        traceback = error.__traceback__  # skip current local scope
+        while (traceback := traceback.tb_next):
+            self.assertNotRegex(
+                str(traceback.tb_frame.f_locals),
+                "<Future at 0x[a-z0-9]+ state=finished raised ZeroDivisionError>",
+            )
 
     @support.requires_resource('walltime')
     def test_map_timeout(self):
