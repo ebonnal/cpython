@@ -642,6 +642,11 @@ class Executor(object):
             finally:
                 for future in fs:
                     future.cancel()
+                # Break potential reference cycles: a failed future must
+                # not be captured in its future._exception.__traceback__.
+                future = None
+                fs.clear()
+
         return result_iterator()
 
     def shutdown(self, wait=True, *, cancel_futures=False):
