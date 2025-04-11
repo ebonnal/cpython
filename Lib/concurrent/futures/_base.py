@@ -4,6 +4,7 @@
 __author__ = 'Brian Quinlan (brian@sweetapp.com)'
 
 import collections
+from concurrent import futures
 import logging
 import threading
 import time
@@ -599,12 +600,21 @@ class Executor(object):
             end_time = timeout + time.monotonic()
 
         zipped_iterables = zip(*iterables)
-        if buffersize:
-            fs = collections.deque(
-                self.submit(fn, *args) for args in islice(zipped_iterables, buffersize)
-            )
+        futures_gen = (self.submit(fn, *args) for args in islice(zipped_iterables, buffersize))
+
+        if as_completed:
+            fs = set(futures_gen)
+            add_to_buffer = fs.add
+            remove_from_buffer = fs.remove
         else:
-            fs = [self.submit(fn, *args) for args in zipped_iterables]
+            if buffersize:
+                fs = collections.deque(futures_gen)
+            else:
+                fs = list(futures_gen)
+            # reverse so that the next (FIFO) future is on the right
+            fs.reverse()
+            add_to_buffer = fs.append
+            remove_from_buffer = fs.pop
 
         # Use a weak reference to ensure that the executor can be garbage
         # collected independently of the result_iterator closure.
@@ -614,12 +624,12 @@ class Executor(object):
         # before the first iterator value is required.
         def result_iterator():
             try:
-                # reverse so that the next (FIFO) future is on the right
-                fs.reverse()
                 # careful not to keep references to futures or results
                 while fs:
                     # wait for the next result
-                    if timeout is None:
+                    if as_completed:
+                        next(futures.as_completed(fs, end_time - time.monotonic() if timeout else None))
+                    elif timeout is None:
                         fs[-1].result()
                     else:
                         fs[-1].result(end_time - time.monotonic())
@@ -630,7 +640,7 @@ class Executor(object):
                         and (executor := executor_weakref())
                         and (args := next(zipped_iterables, None))
                     ):
-                        fs.appendleft(executor.submit(fn, *args))
+                        add_to_buffer(executor.submit(fn, *args))
 
                     # yield the awaited result
                     yield fs.pop()._result
