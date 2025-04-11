@@ -26,6 +26,11 @@ def make_dummy_object(_):
     return MyObject()
 
 
+def sleep_and_return(seconds: int):
+    time.sleep(seconds)
+    return seconds
+
+
 class ExecutorTest:
 
     # Executor.shutdown() and context manager usage is tested by
@@ -166,6 +171,22 @@ class ExecutorTest:
             len(results) + buffersize + len(list(ints_iter)),
             len(ints),
             msg="ints should be either processed, or buffered, or not fetched.",
+        )
+
+    def test_map_as_completed(self):
+        ints = [4, 2, 1, 0]
+        self.assertListEqual(
+            list(self.executor.map(sleep_and_return, ints, as_completed=True)),
+            [0, 1, 2, 4],
+            msg="should yield in First Done First Out if `as_completed=True`.",
+        )
+
+    def test_map_buffersize_as_completed(self):
+        ints = [4, 2, 1, 0]
+        self.assertListEqual(
+            list(self.executor.map(sleep_and_return, ints, buffersize=2, as_completed=True)),
+            [2, 1, 0, 4],
+            msg="should yield in First Done First Out within buffer if `buffersize` is set and `as_completed=True`.",
         )
 
     def test_shutdown_race_issue12456(self):

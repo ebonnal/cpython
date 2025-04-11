@@ -813,7 +813,7 @@ class ProcessPoolExecutor(_base.Executor):
             return f
     submit.__doc__ = _base.Executor.submit.__doc__
 
-    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=None):
+    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=None, as_completed=False):
         """Returns an iterator equivalent to map(fn, iter).
 
         Args:
@@ -829,6 +829,7 @@ class ProcessPoolExecutor(_base.Executor):
                 iterables pauses until a result is yielded from the buffer.
                 If None, all input elements are eagerly collected, and a task is
                 submitted for each.
+            as_completed: Set to yield the results as they become available.
 
         Returns:
             An iterator equivalent to: map(func, *iterables) but the calls may
@@ -845,7 +846,8 @@ class ProcessPoolExecutor(_base.Executor):
         results = super().map(partial(_process_chunk, fn),
                               itertools.batched(zip(*iterables), chunksize),
                               timeout=timeout,
-                              buffersize=buffersize)
+                              buffersize=buffersize
+                              as_completed=as_completed)
         return _chain_from_iterable_of_lists(results)
 
     def shutdown(self, wait=True, *, cancel_futures=False):

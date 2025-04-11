@@ -562,7 +562,7 @@ class Executor(object):
         """
         raise NotImplementedError()
 
-    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=None):
+    def map(self, fn, *iterables, timeout=None, chunksize=1, buffersize=None, as_completed=False):
         """Returns an iterator equivalent to map(fn, iter).
 
         Args:
@@ -579,6 +579,7 @@ class Executor(object):
                 iterables pauses until a result is yielded from the buffer.
                 If None, all input elements are eagerly collected, and a task is
                 submitted for each.
+            as_completed: Set to yield the results as they become available.
 
         Returns:
             An iterator equivalent to: map(func, *iterables) but the calls may
