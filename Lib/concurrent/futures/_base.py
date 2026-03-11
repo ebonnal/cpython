@@ -305,10 +305,12 @@ def wait(fs, timeout=None, return_when=ALL_COMPLETED):
     return DoneAndNotDoneFutures(done, fs - done)
 
 
-def _result_or_cancel(fut, timeout=None):
+def _result_or_cancel(fut, end_time=None):
     try:
         try:
-            return fut.result(timeout)
+            if end_time is None:
+                return fut.result()
+            return fut.result(end_time - time.monotonic())
         finally:
             fut.cancel()
     finally:
@@ -633,7 +635,9 @@ class Executor(object):
         if buffersize is not None and buffersize < 1:
             raise ValueError("buffersize must be None or > 0")
 
-        if timeout is not None:
+        if timeout is None:
+            end_time = None
+        else:
             end_time = timeout + time.monotonic()
 
         zipped_iterables = zip(*iterables)
@@ -641,12 +645,10 @@ class Executor(object):
             fs = collections.deque(
                 self.submit(fn, *args) for args in islice(zipped_iterables, buffersize)
             )
+            executor = self
         else:
             fs = [self.submit(fn, *args) for args in zipped_iterables]
-
-        # Use a weak reference to ensure that the executor can be garbage
-        # collected independently of the result_iterator closure.
-        executor_weakref = weakref.ref(self)
+            executor = None
 
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
@@ -655,17 +657,16 @@ class Executor(object):
                 # reverse to keep finishing order
                 fs.reverse()
                 while fs:
-                    if (
-                        buffersize
-                        and (executor := executor_weakref())
-                        and (args := next(zipped_iterables, None))
-                    ):
-                        fs.appendleft(executor.submit(fn, *args))
+                    if buffersize and (args := next(zipped_iterables, None)):
+                        try:
+                            fs.appendleft(executor.submit(fn, *args))
+                        except RuntimeError:
+                            # 'cannot schedule new futures after shutdown' error
+                            while fs:
+                                yield _result_or_cancel(fs.pop(), end_time)
+                            raise
                     # Careful not to keep a reference to the popped future
-                    if timeout is None:
-                        yield _result_or_cancel(fs.pop())
-                    else:
-                        yield _result_or_cancel(fs.pop(), end_time - time.monotonic())
+                    yield _result_or_cancel(fs.pop(), end_time)
             finally:
                 for future in fs:
                     future.cancel()

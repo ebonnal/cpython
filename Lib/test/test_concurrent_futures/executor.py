@@ -148,6 +148,44 @@ class ExecutorTest:
         self.assertEqual(next(res, None), 2)
         self.assertEqual(next(res, None), 4)
 
+    @warnings_helper.ignore_fork_in_thread_deprecation_warnings()
+    def test_map_buffersize_shutdown_yield_buffer_and_raise(self):
+        ints = range(4)
+        fn = str
+
+        def test(buffersize, pre_shutdown_nexts):
+            expected_results = map(fn, ints)
+
+            with self.executor_type(max_workers=1) as executor:
+                results = executor.map(fn, ints, buffersize=buffersize)
+                # pre-shutdown iteration
+                for _ in range(pre_shutdown_nexts):
+                    self.assertEqual(next(results), next(expected_results))
+
+            # post-shutdown iteration over buffered results
+            expected_result = next(expected_results)
+            for _ in range(buffersize):
+                self.assertEqual(next(results), expected_result)
+                if not (expected_result := next(expected_results, None)):
+                    # input exhausted
+                    break
+            else:
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "cannot schedule new futures after shutdown",
+                ):
+                    next(results)
+            with self.assertRaises(StopIteration):
+                next(results)
+
+        for buffersize in range(len(ints)):
+            for pre_shutdown_nexts in range(buffersize):
+                with self.subTest(
+                    buffersize=buffersize,
+                    pre_shutdown_nexts=pre_shutdown_nexts,
+                ):
+                    test(buffersize, pre_shutdown_nexts)
+
     def test_map_buffersize_on_empty_iterable(self):
         res = self.executor.map(str, [], buffersize=2)
         self.assertIsNone(next(res, None))
