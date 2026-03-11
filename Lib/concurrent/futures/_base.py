@@ -614,12 +614,10 @@ class Executor(object):
             fs = collections.deque(
                 self.submit(fn, *args) for args in islice(zipped_iterables, buffersize)
             )
+            executor = self
         else:
             fs = [self.submit(fn, *args) for args in zipped_iterables]
-
-        # Use a weak reference to ensure that the executor can be garbage
-        # collected independently of the result_iterator closure.
-        executor_weakref = weakref.ref(self)
+            executor = None
 
         # Yield must be hidden in closure so that the futures are submitted
         # before the first iterator value is required.
@@ -628,11 +626,7 @@ class Executor(object):
                 # reverse to keep finishing order
                 fs.reverse()
                 while fs:
-                    if (
-                        buffersize
-                        and (executor := executor_weakref())
-                        and (args := next(zipped_iterables, None))
-                    ):
+                    if buffersize and (args := next(zipped_iterables, None)):
                         fs.appendleft(executor.submit(fn, *args))
                     # Careful not to keep a reference to the popped future
                     if timeout is None:

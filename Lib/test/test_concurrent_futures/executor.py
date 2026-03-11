@@ -139,6 +139,19 @@ class ExecutorTest:
         self.assertEqual(next(res, None), 2)
         self.assertEqual(next(res, None), 4)
 
+    def test_map_buffersize_raise_on_shutdown(self):
+        for start_iteration in (False, True):
+            with self.subTest(start_iteration=start_iteration):
+                with self.executor_type(max_workers=1) as executor:
+                    results = executor.map(str, range(4), buffersize=1)
+                    if start_iteration:
+                        next(results)
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    "cannot schedule new futures after shutdown",
+                ):
+                    next(results)
+
     def test_map_buffersize_on_empty_iterable(self):
         res = self.executor.map(str, [], buffersize=2)
         self.assertIsNone(next(res, None))
